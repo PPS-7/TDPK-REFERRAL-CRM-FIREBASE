@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TDPK International Referral Program</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+  <style>
+    @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
+    body { font-family: "Inter", sans-serif; background-color: #0b0f17; }
+    .card { background-color: #111826; border-radius: 0.75rem; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+    .modal { display: none; position: fixed; inset: 0; z-index: 50; background: rgba(0,0,0,0.45); overflow: auto; }
+    .modal-content { background: #111826; margin: 5% auto; padding: 1.25rem; border-radius: 0.75rem; width: 92%; max-width: 860px; }
+    .close-button { color: #94a3b8; float: right; font-size: 28px; font-weight: 700; cursor: pointer; }
+    .close-button:hover { color: #fff; }
+    .input, select, textarea { background: #1f2937; color: #e5e7eb; border: 1px solid #374151; border-radius: .5rem; padding: .55rem .75rem; }
+    th, td { padding: .75rem; }
+    th { font-size: .75rem; text-transform: uppercase; color: #9ca3af; letter-spacing: .05em; }
+    td { color: #e5e7eb; font-size: .95rem; }
+    .btn { border-radius: .5rem; padding: .5rem .75rem; }
+    .btn-primary { background: #2563eb; color: #fff; }
+    .btn-primary:hover { background: #1d4ed8; }
+    .btn-ghost { background: #0f172a; border: 1px solid #334155; color: #e2e8f0; }
+    .btn-ghost:hover { background: #111827; }
+    .badge { display: inline-block; border-radius: 9999px; padding: .125rem .5rem; font-size: .75rem; }
+    .badge.green { background: #064e3b; color: #a7f3d0; border: 1px solid #065f46; }
+    .badge.yellow { background: #78350f; color: #fde68a; border: 1px solid #92400e; }
+    .badge.red { background: #7f1d1d; color: #fecaca; border: 1px solid #991b1b; }
+    .table-wrap { overflow: auto; border: 1px solid #1f2937; border-radius: .75rem; }
+  </style>
+</head>
+<body class="text-gray-200 p-6 sm:p-10">
+  <div class="max-w-7xl mx-auto space-y-8">
+    <!-- Header -->
+    <header class="flex flex-col sm:flex-row items-center justify-between space-y-4 sm:space-y-0 p-6 card">
+      <div class="flex items-center space-x-4">
+        <h1 class="text-xl sm:text-3xl font-bold text-white">TDPK International Referral Program</h1>
+      </div>
+      <div class="text-sm text-gray-400 text-right">
+        <span class="font-semibold">App ID:</span> <span id="appId"></span><br>
+        <span class="font-semibold">Your User ID:</span> <span id="userIdDisplay"></span>
+      </div>
+    </header>
+
+    <!-- Analytics -->
+    <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div class="p-6 card text-center">
+        <p class="text-sm font-medium text-gray-400">Total Leads</p>
+        <p id="totalLeadsCount" class="mt-1 text-3xl font-semibold text-white">0</p>
+      </div>
+      <div class="p-6 card text-center">
+        <p class="text-sm font-medium text-gray-400">Individual Referrals</p>
+        <p id="individualReferralsCount" class="mt-1 text-3xl font-semibold text-white">0</p>
+      </div>
+      <div class="p-6 card text-center">
+        <p class="text-sm font-medium text-gray-400">Agency Referrals</p>
+        <p id="agencyReferralsCount" class="mt-1 text-3xl font-semibold text-white">0</p>
+      </div>
+      <div class="p-6 card text-center">
+        <p class="text-sm font-medium text-gray-400">Approved Candidates</p>
+        <p id="approvedCandidatesCount" class="mt-1 text-3xl font-semibold text-white">0</p>
+      </div>
+    </section>
+
+    <!-- CRM Table & Controls -->
+    <section class="p-6 card">
+      <div class="flex flex-col sm:flex-row items-center justify-between mb-6 space-y-4 sm:space-y-0">
+        <h2 class="text-2xl font-semibold text-white">Referral Leads</h2>
+        <div class="flex flex-col sm:flex-row items-center space-y-4 sm:space-y-0 sm:space-x-4 w-full sm:w-auto">
+          <input type="text" id="searchInput" placeholder="Search by name, email, phone..." class="input w-full sm:w-64" />
+          <select id="referrerTypeFilter" class="input w-full sm:w-auto">
+            <option value="all">Referrer Type: All</option>
+            <option value="Individual">Individual</option>
+            <option value="Agency">Agency</option>
+          </select>
+          <select id="visaStatusFilter" class="input w-full sm:w-auto">
+            <option value="all">Visa Status: All</option>
+            <option value="In Progress">In Progress</option>
+            <option value="Approved">Approved</option>
+            <option value="Rejected">Rejected</option>
+          </select>
+          <button id="addNewLeadBtn" class="btn btn-primary w-full sm:w-auto">Add New Lead</button>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table class="min-w-full">
+          <thead class="bg-gray-900 sticky top-0">
+            <tr>
+              <th>Time</th>
+              <th>Referrer Name</th>
+              <th>Referral Type</th>
+              <th>Client Name</th>
+              <th>Visa Type</th>
+              <th>Visa Status</th>
+              <th class="text-right pr-4">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="leadsTableBody" class="divide-y divide-gray-800"></tbody>
+        </table>
+      </div>
+      <div id="noResults" class="hidden text-center text-gray-400 mt-4 py-4">No matching leads found.</div>
+    </section>
+
+    <!-- Master Referral Tracking (View Only) -->
+    <section class="p-6 card">
+      <div class="flex items-center justify-between">
+        <h2 class="text-2xl font-semibold text-white">Master Referral Tracking (View Only)</h2>
+        <a id="openMasterSheetLink" href="#" target="_blank" class="text-sm underline text-blue-400">Open in Google Sheets</a>
+      </div>
+      <p class="text-gray-400 text-sm mt-1">Mirrors the “Master Referral Tracking” tab. Not editable here.</p>
+
+      <div class="table-wrap mt-6">
+        <table class="min-w-full">
+          <thead id="masterHead" class="bg-gray-900"></thead>
+          <tbody id="masterBody" class="divide-y divide-gray-800"></tbody>
+        </table>
+      </div>
+      <div id="masterEmpty" class="hidden text-center text-gray-400 mt-4 py-4">No data available.</div>
+    </section>
+  </div>
+
+  <!-- Add/Edit Lead Modal -->
+  <div id="leadModal" class="modal">
+    <div class="modal-content">
+      <div class="flex justify-between items-center pb-2">
+        <h3 id="modalTitle" class="text-2xl font-semibold text-white">Add New Lead</h3>
+        <span class="close-button" onclick="closeModal('leadModal')">&times;</span>
+      </div>
+      <form id="leadForm" class="space-y-6">
+        <input type="hidden" id="docId" />
+        <!-- Referrer Details -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div><label class="block text-sm text-gray-300">Referrer Name</label><input id="ReferrerName" class="input w-full" required /></div>
+          <div><label class="block text-sm text-gray-300">Referrer Email</label><input id="ReferrerEmail" type="email" class="input w-full" /></div>
+          <div><label class="block text-sm text-gray-300">Referrer Phone</label><input id="ReferrerPhone" class="input w-full" /></div>
+          <div><label class="block text-sm text-gray-300">Referrer Type</label><select id="ReferrerType" class="input w-full"><option>Individual</option><option>Agency</option></select></div>
+        </div>
+        <!-- Client Details -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div><label class="block text-sm text-gray-300">Client Fullname</label><input id="ClientName" class="input w-full" required /></div>
+          <div><label class="block text-sm text-gray-300">Client Email</label><input id="ClientEmail" type="email" class="input w-full" /></div>
+          <div><label class="block text-sm text-gray-300">Client Phone Number</label><input id="ClientPhone" class="input w-full" /></div>
+          <div><label class="block text-sm text-gray-300">Client Company/Position</label><input id="ClientCompany" class="input w-full" /></div>
+        </div>
+        <!-- Visa & Status -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div><label class="block text-sm text-gray-300">Visa Type</label><select id="VisaType" class="input w-full"><option>DTV</option><option>LTR</option><option>Smart S</option><option>TPC</option></select></div>
+          <div><label class="block text-sm text-gray-300">Visa Status</label><select id="VisaStatus" class="input w-full"><option>In Progress</option><option>Approved</option><option>Rejected</option></select></div>
+        </div>
+        <div id="RejectionReasonDiv" class="hidden"><label class="block text-sm text-gray-300">Reason for Rejection</label><textarea id="RejectionReason" rows="3" class="input w-full"></textarea></div>
+        <!-- Conditional Reward / Payment -->
+        <div id="IndividualRewardDiv"><label class="block text-sm text-gray-300">Referral Reward Selection</label><select id="IndividualReward" class="input w-full"><option value="Coworking">1-month coworking space access</option><option value="Meeting Room">3,000 THB of meeting room credit</option></select></div>
+        <div id="AgencyPaymentDiv" class="hidden"><label class="block text-sm text-gray-300">Payment Status</label><select id="PaymentStatus" class="input w-full"><option>Pending</option><option>Paid</option><option>In Progress</option></select></div>
+        <div class="flex items-center justify-end gap-2">
+          <button type="button" class="btn btn-ghost" onclick="closeModal('leadModal')">Cancel</button>
+          <button id="saveBtn" class="btn btn-primary" type="submit">Save</button>
+        </div>
+        <p id="formError" class="text-sm text-red-300"></p>
+      </form>
+    </div>
+  </div>
+
+  <!-- Profile (View) Modal with Notes input -->
+  <div id="profileModal" class="modal">
+    <div class="modal-content">
+      <div class="flex justify-between items-center pb-2">
+        <h3 class="text-2xl font-semibold text-white">Lead Profile</h3>
+        <span class="close-button" onclick="closeModal('profileModal')">&times;</span>
+      </div>
+      <div id="profileContent" class="space-y-6"></div>
+      <div class="flex justify-end pt-2">
+        <button class="btn btn-ghost" onclick="closeModal('profileModal')">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Message/Confirm Modal -->
+  <div id="messageModal" class="modal">
+    <div class="modal-content !p-6">
+      <h3 id="messageTitle" class="text-xl font-semibold text-white mb-4"></h3>
+      <p id="messageText" class="text-gray-300 mb-6"></p>
+      <div class="flex justify-end gap-2">
+        <button id="cancelMsgBtn" class="btn btn-ghost hidden">Cancel</button>
+        <button id="okMsgBtn" class="btn btn-primary">OK</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+    import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+    import { getFirestore, doc, getDoc, addDoc, setDoc, updateDoc, deleteDoc, onSnapshot, collection, query, orderBy, where, getDocs, Timestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+    import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+    
+    setLogLevel('debug');
+
+    /***********************
+      * CONFIG
+      ***********************/
+    const MASTER_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSve5MYbZ7TUkDNHpYyWIHoi8mF32dFuEMmm2DCZTTd0o2gsWFRBG66ju9YKczVSrF1AxygZqvWwJ6K/pub?gid=1540779843&single=true&output=csv";
+    const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+    const firebaseConfig = JSON.parse(__firebase_config);
+
+    let db;
+    let auth;
+    let userId = null;
+    let leads = [];
+
+    /***********************
+      * UTILS
+      ***********************/
+    const qs = (s) => document.querySelector(s);
+    const qsa = (s) => Array.from(document.querySelectorAll(s));
+    const cacheBust = (url) => `${url}${url.includes("?") ? "&" : "?"}v=${Date.now()}`;
+    const fmtTime = (t) => t ? new Date(t).toLocaleString() : "";
+    const show = (el) => el.classList.remove("hidden");
+    const hide = (el) => el.classList.add("hidden");
+    const generateId = () => Date.now().toString(36) + Math.random().toString(36).substr(2);
+
+    function messageBox(title, text, isConfirm = false) {
+      return new Promise(resolve => {
+        qs('#messageTitle').innerText = title;
+        qs('#messageText').innerText = text;
+        const okBtn = qs('#okMsgBtn');
+        const cancelBtn = qs('#cancelMsgBtn');
+        cancelBtn.classList.toggle('hidden', !isConfirm);
+        okBtn.onclick = () => { closeModal('messageModal'); resolve(true); };
+        if (isConfirm) { cancelBtn.onclick = () => { closeModal('messageModal'); resolve(false); }; }
+        openModal('messageModal');
+      });
+    }
+
+    function badgeForStatus(status){
+      if(status === "Approved") return '<span class="badge green">Approved</span>';
+      if(status === "Rejected") return '<span class="badge red">Rejected</span>';
+      return '<span class="badge yellow">In Progress</span>';
+    }
+
+    function openModal(id){ document.getElementById(id).style.display = "block"; }
+    function closeModal(id){ document.getElementById(id).style.display = "none"; }
+    
+    /***********************
+      * FIREBASE INIT & LISTENERS
+      ***********************/
+    async function initFirebase() {
+      try {
+        const app = initializeApp(firebaseConfig);
+        db = getFirestore(app);
+        auth = getAuth(app);
+        
+        if (typeof __initial_auth_token !== 'undefined') {
+          await signInWithCustomToken(auth, __initial_auth_token);
+        } else {
+          await signInAnonymously(auth);
+        }
+        
+        onAuthStateChanged(auth, (user) => {
+          if (user) {
+            userId = user.uid;
+            qs('#userIdDisplay').innerText = userId;
+            startDataListener();
+          } else {
+            console.error("User not authenticated.");
+          }
+        });
+      } catch (e) {
+        console.error("Firebase init failed:", e);
+      }
+    }
+
+    function startDataListener() {
+      const leadsCol = collection(db, `artifacts/${appId}/public/data/leads`);
+      onSnapshot(leadsCol, (querySnapshot) => {
+        leads = [];
+        querySnapshot.forEach((doc) => {
+          leads.push({ id: doc.id, ...doc.data() });
+        });
+        renderAll();
+      }, (error) => {
+        console.error("Failed to fetch leads from Firestore:", error);
+      });
+    }
+
+    /***********************
+      * LOADERS
+      ***********************/
+    async function loadMaster(){
+      try{
+        const res = await fetch(cacheBust(MASTER_CSV_URL));
+        if(!res.ok) throw new Error(`Master CSV load failed: ${res.status}`);
+        const text = await res.text();
+        const parsed = Papa.parse(text.trim());
+        const rows = parsed.data;
+        if(!rows.length){ show(qs('#masterEmpty')); return; }
+        hide(qs('#masterEmpty'));
+        const head = rows[0];
+        const body = rows.slice(1).filter(r=>r.length && r.some(c=>String(c).trim()!==""));
+        qs('#masterHead').innerHTML = `<tr>${head.map(h=>`<th>${h}</th>`).join('')}</tr>`;
+        qs('#masterBody').innerHTML = body.slice(0,300).map(r=>`<tr>${r.map(c=>`<td>${String(c||"")}</td>`).join('')}</tr>`).join('');
+        const openLink = MASTER_CSV_URL.replace(/\/pub\?.*$/, "/edit");
+        qs('#openMasterSheetLink').href = openLink;
+      }catch(e){ console.error(e); }
+    }
+
+    /***********************
+      * RENDER
+      ***********************/
+    function renderCounters(){
+      qs('#totalLeadsCount').innerText = leads.length;
+      qs('#individualReferralsCount').innerText = leads.filter(l => String(l["ReferrerType"]) === 'Individual').length;
+      qs('#agencyReferralsCount').innerText = leads.filter(l => String(l["ReferrerType"]) === 'Agency').length;
+      qs('#approvedCandidatesCount').innerText = leads.filter(l => String(l["VisaStatus"]) === 'Approved').length;
+    }
+
+    function renderLeads(){
+      const tbody = qs('#leadsTableBody');
+      tbody.innerHTML = '';
+      const search = qs('#searchInput').value.trim().toLowerCase();
+      const typeF = qs('#referrerTypeFilter').value;
+      const visaF = qs('#visaStatusFilter').value;
+      const filtered = leads.filter(l => {
+        const matchesSearch = !search || [
+          l["ReferrerName"], l["ReferrerEmail"], l["ReferrerPhone"],
+          l["ClientName"], l["ClientEmail"], l["ClientPhone"], l["ClientCompany/Position"]
+        ].some(v => String(v||'').toLowerCase().includes(search));
+        const matchesType = (typeF === 'all') || (String(l["ReferrerType"]||'') === typeF);
+        const matchesVisa = (visaF === 'all') || (String(l["VisaStatus"]||'') === visaF);
+        return matchesSearch && matchesType && matchesVisa;
+      });
+      if(filtered.length === 0) show(qs('#noResults')); else hide(qs('#noResults'));
+
+      filtered.forEach(l => {
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-slate-800/40';
+        const timestamp = l["Timestamp"] ? (l["Timestamp"].toDate ? fmtTime(l["Timestamp"].toDate()) : fmtTime(l["Timestamp"])) : '';
+        tr.innerHTML = `
+          <td>${timestamp}</td>
+          <td>${l["ReferrerName"]||''}</td>
+          <td>${l["ReferrerType"]||''}</td>
+          <td>${l["ClientName"]||''}</td>
+          <td>${l["VisaType"]||''}</td>
+          <td>${badgeForStatus(l["VisaStatus"]||'In Progress')}</td>
+          <td class="text-right pr-2">
+            <button class="btn btn-ghost mr-2" onclick='viewLead(${JSON.stringify(l.id)})'>View</button>
+            <button class="btn btn-ghost mr-2" onclick='editLead(${JSON.stringify(l.id)})'>Edit</button>
+            <button class="btn btn-ghost" onclick='deleteLead(${JSON.stringify(l.id)})'>Del</button>
+          </td>`;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function renderAll(){
+      renderLeads();
+      renderCounters();
+    }
+
+    /***********************
+      * FORM HELPERS
+      ***********************/
+    function clearForm(){
+      qsa('#leadForm input, #leadForm textarea, #leadForm select').forEach(el => {
+        if(el.id === 'VisaType') { el.value = 'DTV'; return; }
+        if(el.id === 'VisaStatus') { el.value = 'In Progress'; return; }
+        if(el.id === 'ReferrerType') { el.value = 'Individual'; return; }
+        if(el.id === 'PaymentStatus') { el.value = 'Pending'; return; }
+        el.value = '';
+      });
+      hide(qs('#RejectionReasonDiv'));
+      show(qs('#IndividualRewardDiv'));
+      hide(qs('#AgencyPaymentDiv'));
+      qs('#formError').innerText = '';
+    }
+
+    function collectFormData(){
+      const docId = qs('#docId').value || null;
+      const refType = qs('#ReferrerType').value;
+      const visaStatus = qs('#VisaStatus').value;
+      const obj = {
+        "id": docId,
+        "Timestamp": Timestamp.now(),
+        "ReferrerName": qs('#ReferrerName').value.trim(),
+        "ReferrerEmail": qs('#ReferrerEmail').value.trim(),
+        "ReferrerPhone": qs('#ReferrerPhone').value.trim(),
+        "ReferrerType": refType,
+        "IndividualReward": refType === 'Individual' ? qs('#IndividualReward').value : '',
+        "PaymentStatus": refType === 'Agency' ? qs('#PaymentStatus').value : '',
+        "ClientName": qs('#ClientName').value.trim(),
+        "ClientEmail": qs('#ClientEmail').value.trim(),
+        "ClientPhone": qs('#ClientPhone').value.trim(),
+        "ClientCompany/Position": qs('#ClientCompany').value.trim(),
+        "VisaType": qs('#VisaType').value,
+        "VisaStatus": visaStatus,
+        "RejectionReason": (visaStatus === 'Rejected') ? qs('#RejectionReason').value.trim() : '',
+        "Notes": []
+      };
+      if(!obj["ReferrerName"]) throw new Error('Referrer Name is required.');
+      if(!obj["ClientName"]) throw new Error('Client Name is required.');
+      return obj;
+    }
+
+    /***********************
+      * CRUD with FIRESTORE
+      ***********************/
+    async function addOrUpdateLead(payload){
+      try {
+        if (payload.id) {
+          const docRef = doc(db, `artifacts/${appId}/public/data/leads`, payload.id);
+          delete payload.id;
+          await updateDoc(docRef, payload);
+          console.log("Document updated with ID: ", docRef.id);
+        } else {
+          const docRef = await addDoc(collection(db, `artifacts/${appId}/public/data/leads`), payload);
+          console.log("Document written with ID: ", docRef.id);
+        }
+        closeModal('leadModal');
+      } catch (e) {
+        console.error("Error adding/updating document: ", e);
+        await messageBox('Save Failed', `Error saving document: ${e.message}`);
+      }
+    }
+
+    async function deleteLead(docId){
+      const confirmed = await messageBox('Confirm Delete', 'Are you sure you want to delete this lead? This action is permanent.', true);
+      if(!confirmed) return;
+      try {
+        await deleteDoc(doc(db, `artifacts/${appId}/public/data/leads`, docId));
+        console.log("Document deleted with ID:", docId);
+      } catch (e) {
+        console.error("Error deleting document: ", e);
+        await messageBox('Deletion Failed', `Error deleting document: ${e.message}`);
+      }
+    }
+    
+    /***********************
+      * NOTES (from View modal)
+      ***********************/
+    async function appendNote(docId, noteText){
+      if (!docId || !noteText) return;
+      try {
+        const leadRef = doc(db, `artifacts/${appId}/public/data/leads`, docId);
+        const leadSnap = await getDoc(leadRef);
+        const existingNotes = leadSnap.exists() ? (leadSnap.data().Notes || []) : [];
+        const updatedNotes = [...existingNotes, { at: new Date().toISOString(), by: userId, note: noteText }];
+        await updateDoc(leadRef, { Notes: updatedNotes });
+        console.log("Note added to document:", docId);
+        viewLead(docId); // Re-render modal to show new note
+      } catch(e) {
+        console.error("Error adding note:", e);
+      }
+    }
+
+    /***********************
+      * UI ACTIONS
+      ***********************/
+    // Open add lead
+    document.getElementById('addNewLeadBtn').onclick = () => { clearForm(); qs('#modalTitle').innerText = 'Add New Lead'; openModal('leadModal'); };
+
+    // Conditional fields
+    document.getElementById('ReferrerType').addEventListener('change', (e)=>{
+      const isAgency = e.target.value === 'Agency';
+      document.getElementById('IndividualRewardDiv').classList.toggle('hidden', isAgency);
+      document.getElementById('AgencyPaymentDiv').classList.toggle('hidden', !isAgency);
+    });
+    document.getElementById('VisaStatus').addEventListener('change', (e)=>{
+      const isRejected = e.target.value === 'Rejected';
+      document.getElementById('RejectionReasonDiv').classList.toggle('hidden', !isRejected);
+    });
+
+    // Save lead
+    document.getElementById('leadForm').addEventListener('submit', async (e)=>{
+      e.preventDefault(); qs('#formError').innerText = '';
+      try {
+        const payload = collectFormData();
+        await addOrUpdateLead(payload);
+      } catch(err){
+        await messageBox('Save Failed', err.message);
+      }
+    });
+
+    // Filters
+    qs('#searchInput').addEventListener('input', renderLeads);
+    qs('#referrerTypeFilter').addEventListener('change', renderLeads);
+    qs('#visaStatusFilter').addEventListener('change', renderLeads);
+
+    // View & Edit
+    function viewLead(docId){
+      const l = leads.find(x => x.id === docId); if(!l) return;
+      const notesArr = l["Notes"] || [];
+      const notesHtml = notesArr.length ? notesArr.map(n => `
+        <div class="p-3 bg-slate-800 rounded-md border border-slate-700">
+          <p class="text-sm">${n.note}</p>
+          <p class="text-xs text-gray-400 mt-1">${new Date(n.at).toLocaleString()} by ${n.by ? n.by.substring(0, 8) + '...' : 'Unknown'}</p>
+        </div>`).join('') : '<p class="text-gray-400">No notes yet.</p>';
+
+      const kv = (k, v) => `<div><p class="text-xs text-gray-400">${k}</p><p class="text-sm">${v||''}</p></div>`;
+      
+      const timestamp = l["Timestamp"] ? (l["Timestamp"].toDate ? fmtTime(l["Timestamp"].toDate()) : fmtTime(l["Timestamp"])) : '';
+
+      qs('#profileContent').innerHTML = `
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          ${kv('Added By', l['AddedBy'] ? l['AddedBy'].substring(0, 8) + '...' : 'Unknown')}
+          ${kv('Timestamp', timestamp)}
+          ${kv('Referrer Name', l['ReferrerName'])}
+          ${kv('Referrer Email', l['ReferrerEmail'])}
+          ${kv('Referrer Phone', l['ReferrerPhone'])}
+          ${kv('Referrer Type', l['ReferrerType'])}
+          ${kv('Client Name', l['ClientName'])}
+          ${kv('Client Email', l['ClientEmail'])}
+          ${kv('Client Phone', l['ClientPhone'])}
+          ${kv('Client Company/Position', l['ClientCompany/Position'])}
+          ${kv('Visa Type', l['VisaType'])}
+          ${kv('Visa Status', l['VisaStatus'])}
+          ${l['ReferrerType']==='Individual' ? kv('Individual Reward', l['IndividualReward']) : ''}
+          ${l['ReferrerType']==='Agency' ? kv('Payment Status', l['PaymentStatus']) : ''}
+          ${l['VisaStatus']==='Rejected' ? kv('Rejection Reason', l['RejectionReason']) : ''}
+        </div>
+        <div class="space-y-3 mt-4">
+          <h4 class="text-lg font-semibold text-white">Notes</h4>
+          <div id="notesList" class="space-y-2">${notesHtml}</div>
+          <textarea id="newNote" rows="2" class="input w-full" placeholder="Add a note (staff-only)"></textarea>
+          <div class="flex justify-end"><button class="btn btn-primary" onclick='appendNote(${JSON.stringify(docId)}, document.getElementById("newNote").value.trim())'>Add Note</button></div>
+        </div>
+        <div class="flex justify-end gap-2 pt-4">
+          <button class="btn btn-ghost" onclick='editLead(${JSON.stringify(docId)})'>Edit</button>
+        </div>`;
+      openModal('profileModal');
+    }
+
+    function editLead(docId){
+      closeModal('profileModal');
+      const l = leads.find(x => x.id === docId); if(!l) return;
+      clearForm();
+      qs('#modalTitle').innerText = 'Edit Lead';
+      qs('#docId').value = l.id || '';
+      qs('#ReferrerName').value = l['ReferrerName'] || '';
+      qs('#ReferrerEmail').value = l['ReferrerEmail'] || '';
+      qs('#ReferrerPhone').value = l['ReferrerPhone'] || '';
+      qs('#ReferrerType').value = l['ReferrerType'] || 'Individual';
+      qs('#ClientName').value = l['ClientName'] || '';
+      qs('#ClientEmail').value = l['ClientEmail'] || '';
+      qs('#ClientPhone').value = l['ClientPhone'] || '';
+      qs('#ClientCompany').value = l['ClientCompany/Position'] || '';
+      qs('#VisaType').value = l['VisaType'] || 'DTV';
+      qs('#VisaStatus').value = l['VisaStatus'] || 'In Progress';
+      qs('#RejectionReason').value = l['RejectionReason'] || '';
+      const isAgency = (qs('#ReferrerType').value === 'Agency');
+      document.getElementById('IndividualRewardDiv').classList.toggle('hidden', isAgency);
+      document.getElementById('AgencyPaymentDiv').classList.toggle('hidden', !isAgency);
+      if(isAgency) { qs('#PaymentStatus').value = l['PaymentStatus'] || 'Pending'; }
+      else { qs('#IndividualReward').value = l['IndividualReward'] || 'Coworking'; }
+      document.getElementById('RejectionReasonDiv').classList.toggle('hidden', qs('#VisaStatus').value !== 'Rejected');
+      openModal('leadModal');
+    }
+
+    // expose for buttons in table
+    window.viewLead = viewLead;
+    window.editLead = editLead;
+    window.deleteLead = deleteLead;
+    window.messageBox = messageBox;
+    window.appendNote = appendNote;
+    
+    /***********************
+      * INIT
+      ***********************/
+    async function init(){
+      qs('#appId').innerText = appId;
+      await initFirebase();
+      await loadMaster();
+    }
+
+    window.onload = init;
+  </script>
+</body>
+</html>
