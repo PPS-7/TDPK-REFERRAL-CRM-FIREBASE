@@ -189,23 +189,27 @@
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-    import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+    import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
     import { getFirestore, doc, getDoc, addDoc, setDoc, updateDoc, deleteDoc, onSnapshot, collection, query, orderBy, where, getDocs, Timestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
     import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
     
     setLogLevel('debug');
 
-    /***********************
-      * CONFIG
-      ***********************/
-    const MASTER_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSve5MYbZ7TUkDNHpYyWIHoi8mF32dFuEMmm2DCZTTd0o2gsWFRBG66ju9YKczVSrF1AxygZqvWwJ6K/pub?gid=1540779843&single=true&output=csv";
-    const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-    const firebaseConfig = JSON.parse(__firebase_config);
+    const firebaseConfig = {
+      apiKey: "AIzaSyAXwON4hXY846UWQb0-Nj-eWLLO4XqhMb0",
+      authDomain: "referral-program-crm.firebaseapp.com",
+      projectId: "referral-program-crm",
+      storageBucket: "referral-program-crm.firebasestorage.app",
+      messagingSenderId: "36290345220",
+      appId: "1:36290345220:web:34c32e05025a9f3bbe7851",
+      measurementId: "G-NC6GL5YF6K"
+    };
 
     let db;
     let auth;
     let userId = null;
     let leads = [];
+    const publicAppId = 'unique-app-id-for-your-project';
 
     /***********************
       * UTILS
@@ -249,11 +253,8 @@
         db = getFirestore(app);
         auth = getAuth(app);
         
-        if (typeof __initial_auth_token !== 'undefined') {
-          await signInWithCustomToken(auth, __initial_auth_token);
-        } else {
-          await signInAnonymously(auth);
-        }
+        // Sign in anonymously for public access
+        await signInAnonymously(auth);
         
         onAuthStateChanged(auth, (user) => {
           if (user) {
@@ -270,7 +271,7 @@
     }
 
     function startDataListener() {
-      const leadsCol = collection(db, `artifacts/${appId}/public/data/leads`);
+      const leadsCol = collection(db, `artifacts/${publicAppId}/public/data/leads`);
       onSnapshot(leadsCol, (querySnapshot) => {
         leads = [];
         querySnapshot.forEach((doc) => {
@@ -405,12 +406,12 @@
     async function addOrUpdateLead(payload){
       try {
         if (payload.id) {
-          const docRef = doc(db, `artifacts/${appId}/public/data/leads`, payload.id);
+          const docRef = doc(db, `artifacts/${publicAppId}/public/data/leads`, payload.id);
           delete payload.id;
           await updateDoc(docRef, payload);
           console.log("Document updated with ID: ", docRef.id);
         } else {
-          const docRef = await addDoc(collection(db, `artifacts/${appId}/public/data/leads`), payload);
+          const docRef = await addDoc(collection(db, `artifacts/${publicAppId}/public/data/leads`), payload);
           console.log("Document written with ID: ", docRef.id);
         }
         closeModal('leadModal');
@@ -424,7 +425,7 @@
       const confirmed = await messageBox('Confirm Delete', 'Are you sure you want to delete this lead? This action is permanent.', true);
       if(!confirmed) return;
       try {
-        await deleteDoc(doc(db, `artifacts/${appId}/public/data/leads`, docId));
+        await deleteDoc(doc(db, `artifacts/${publicAppId}/public/data/leads`, docId));
         console.log("Document deleted with ID:", docId);
       } catch (e) {
         console.error("Error deleting document: ", e);
@@ -438,7 +439,7 @@
     async function appendNote(docId, noteText){
       if (!docId || !noteText) return;
       try {
-        const leadRef = doc(db, `artifacts/${appId}/public/data/leads`, docId);
+        const leadRef = doc(db, `artifacts/${publicAppId}/public/data/leads`, docId);
         const leadSnap = await getDoc(leadRef);
         const existingNotes = leadSnap.exists() ? (leadSnap.data().Notes || []) : [];
         const updatedNotes = [...existingNotes, { at: new Date().toISOString(), by: userId, note: noteText }];
@@ -563,8 +564,10 @@
     /***********************
       * INIT
       ***********************/
+    const MASTER_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSve5MYbZ7TUkDNHpYyWIHoi8mF32dFuEMmm2DCZTTd0o2gsWFRBG66ju9YKczVSrF1AxygZqvWwJ6K/pub?gid=1540779843&single=true&output=csv";
+
     async function init(){
-      qs('#appId').innerText = appId;
+      qs('#appId').innerText = publicAppId;
       await initFirebase();
       await loadMaster();
     }
